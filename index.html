@@ -1,11 +1,272 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Which Design Pattern Are You? :: Psychology of Code</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:wght@400;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <div class="grain-overlay"></div>
     
+    <main>
+        <header class="intro-header">
+            <div class="header-ornament">⟨/⟩</div>
+            <h1>Which Design Pattern Are You?</h1>
+            <p class="subtitle">A psychological exploration through the lens of software architecture</p>
+            <div class="divider"></div>
+        </header>
+
+        <section id="quiz-container">
+            <div id="progress-wrapper">
+                <div id="progress"></div>
+            </div>
+            
+            <div id="slide-wrapper">
+                <form id="quiz-form" aria-labelledby="quiz-title"></form>
+            </div>
+            
+            <div id="nav-buttons">
+                <button id="prev-btn" class="btn-secondary">
+                    <span class="btn-icon">←</span>
+                    <span class="btn-text">Previous</span>
+                </button>
+                <button id="next-btn" class="btn-primary">
+                    <span class="btn-text">Next</span>
+                    <span class="btn-icon">→</span>
+                </button>
+                <button id="submit-btn" class="btn-submit" disabled>
+                    <span class="btn-text">Reveal My Pattern</span>
+                    <span class="btn-icon">✦</span>
+                </button>
+            </div>
+            
+            <div id="result" aria-live="polite"></div>
+        </section>
+
+        <footer class="quiz-footer">
+            <p>Based on the Gang of Four design patterns</p>
+        </footer>
+    </main>
+
+    <script src="test.js"></script>
+    <script src="pattern_results.js"></script>
+    <script>
+        (function(){
+            const form = document.getElementById('quiz-form');
+            const submitBtn = document.getElementById('submit-btn');
+            const prevBtn = document.getElementById('prev-btn');
+            const nextBtn = document.getElementById('next-btn');
+            const resultEl = document.getElementById('result');
+            const progressEl = document.getElementById('progress');
+            const progressWrapper = document.getElementById('progress-wrapper');
+            let currentSlide = 0;
+            const answers = {};
+
+            function renderSlide(slideIdx) {
+                if (typeof questions === 'undefined' || !questions.length) {
+                    form.innerHTML = '<p>No questions available.</p>';
+                    return;
+                }
+
+                form.innerHTML = '';
+                const q = questions[slideIdx];
+                const fieldset = document.createElement('fieldset');
+                fieldset.classList.add('slide-animation');
+                
+                const legend = document.createElement('legend');
+                legend.innerHTML = `<span class="question-number">Q${slideIdx + 1}</span>${q.text}`;
+                fieldset.appendChild(legend);
+
+                const choicesContainer = document.createElement('div');
+                choicesContainer.className = 'choices-container';
+
+                q.choices.forEach((choice, ci) => {
+                    const label = document.createElement('label');
+                    label.className = 'choice-label';
+                    
+                    const input = document.createElement('input');
+                    input.type = 'radio';
+                    input.name = 'q' + slideIdx;
+                    input.value = String(ci);
+                    if (answers[slideIdx] === ci) {
+                        input.checked = true;
+                        label.classList.add('selected');
+                    }
+                    
+                    input.addEventListener('change', () => {
+                        answers[slideIdx] = ci;
+                        // Update visual selection
+                        choicesContainer.querySelectorAll('.choice-label').forEach(l => l.classList.remove('selected'));
+                        label.classList.add('selected');
+                        updateNavButtons();
+                    });
+
+                    const choiceContent = document.createElement('span');
+                    choiceContent.className = 'choice-content';
+                    choiceContent.textContent = choice;
+
+                    const checkmark = document.createElement('span');
+                    checkmark.className = 'choice-checkmark';
+                    checkmark.textContent = '✓';
+
+                    label.appendChild(input);
+                    label.appendChild(choiceContent);
+                    label.appendChild(checkmark);
+                    choicesContainer.appendChild(label);
+                });
+
+                fieldset.appendChild(choicesContainer);
+                form.appendChild(fieldset);
+                updateProgress(slideIdx);
+                updateNavButtons();
+            }
+
+            function updateProgress(slideIdx) {
+                const pct = ((slideIdx + 1) / questions.length) * 100;
+                progressEl.innerHTML = `
+                    <div class="progress-text">
+                        <span class="progress-current">Question ${slideIdx + 1}</span>
+                        <span class="progress-total">of ${questions.length}</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-bar-fill" style="width: ${pct}%"></div>
+                    </div>
+                `;
+            }
+
+            function updateNavButtons() {
+                const hasAnswer = answers[currentSlide] !== undefined;
+                const isLast = currentSlide === questions.length - 1;
+                const isFirst = currentSlide === 0;
+
+                prevBtn.style.display = isFirst ? 'none' : 'flex';
+                nextBtn.style.display = isLast ? 'none' : 'flex';
+                submitBtn.style.display = isLast ? 'flex' : 'none';
+                submitBtn.disabled = !hasAnswer;
+                nextBtn.disabled = !hasAnswer;
+            }
+
+            prevBtn.addEventListener('click', () => {
+                if (currentSlide > 0) {
+                    currentSlide--;
+                    renderSlide(currentSlide);
+                    form.scrollIntoView({behavior: 'smooth', block: 'center'});
+                }
+            });
+
+            nextBtn.addEventListener('click', () => {
+                if (currentSlide < questions.length - 1) {
+                    currentSlide++;
+                    renderSlide(currentSlide);
+                    form.scrollIntoView({behavior: 'smooth', block: 'center'});
+                }
+            });
+
+            submitBtn.addEventListener('click', function (e) {
+                e.preventDefault();
+                const answerArray = questions.map((_, i) => answers[i]);
+                const scores = calculatePatternScores(answerArray);
+                const topPattern = getTopPattern(scores);
+                
+                // Use the detailed profile if available
+                if (typeof patternProfiles !== 'undefined' && patternProfiles[topPattern]) {
+                    const profile = patternProfiles[topPattern];
+                    
+                    resultEl.innerHTML = `
+                        <div class="result-reveal">
+                            <div class="result-ornament">⟨/⟩</div>
+                            <h2 class="result-title">${profile.name}</h2>
+                            <p class="result-tagline">${profile.tagline}</p>
+                        </div>
+
+                        <div class="result-section personality-section">
+                            <h3>Your Psychological Profile</h3>
+                            <p class="personality-text">${profile.personality}</p>
+                        </div>
+
+                        <div class="result-section strengths-section">
+                            <h3>💪 Core Strengths</h3>
+                            <ul class="traits-list">
+                                ${profile.strengths.map(s => `<li><span class="trait-marker">✓</span>${s}</li>`).join('')}
+                            </ul>
+                        </div>
+
+                        <div class="result-section challenges-section">
+                            <h3>⚠️ Growth Edges</h3>
+                            <ul class="traits-list">
+                                ${profile.challenges.map(c => `<li><span class="trait-marker">⚡</span>${c}</li>`).join('')}
+                            </ul>
+                        </div>
+
+                        <div class="result-grid">
+                            <div class="result-card">
+                                <h4>❤️ In Relationships</h4>
+                                <p>${profile.relationships}</p>
+                            </div>
+                            <div class="result-card">
+                                <h4>💼 In Career</h4>
+                                <p>${profile.career}</p>
+                            </div>
+                        </div>
+
+                        <div class="result-section growth-section">
+                            <h3>🌱 Advice for Growth</h3>
+                            <p class="growth-text">${profile.growth_advice}</p>
+                        </div>
+
+                        <div class="result-quotes">
+                            <blockquote class="result-quote">
+                                ${profile.famous_quote}
+                            </blockquote>
+                            <p class="result-motto">"${profile.life_motto}"</p>
+                        </div>
+
+                        <div class="result-section secondary-section">
+                            <h3>Pattern Breakdown</h3>
+                            <div class="score-grid">
+                                ${Object.entries(scores)
+                                    .sort((a, b) => b[1] - a[1])
+                                    .slice(0, 5)
+                                    .map(([p, s]) => `
+                                        <div class="score-item ${p === topPattern ? 'primary' : ''}">
+                                            <span class="score-name">${patterns[p].name}</span>
+                                            <span class="score-value">${s}</span>
+                                        </div>
+                                    `).join('')}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // Fallback to simple result
+                    const patternData = patterns[topPattern];
+                    resultEl.innerHTML = `
+                        <div class="result-reveal">
+                            <div class="result-ornament">⟨/⟩</div>
+                            <h2 class="result-title">${patternData.name}</h2>
+                            <p class="result-tagline">${patternData.desc}</p>
+                        </div>
+                    `;
+                }
+                
+                // Hide form and nav buttons, show result
+                form.style.display = 'none';
+                document.getElementById('nav-buttons').style.display = 'none';
+                progressWrapper.style.display = 'none';
+                resultEl.style.display = 'block';
+                
+                // Smooth scroll to result
+                setTimeout(() => {
+                    resultEl.scrollIntoView({behavior: 'smooth', block: 'start'});
+                }, 100);
+            });
+
+            // Initialize
+            renderSlide(0);
+        })();
+    </script>
 </body>
 </html>
